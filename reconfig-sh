@@ -1,0 +1,135 @@
+#! /bin/sh
+# Copyright (C) 2017 CETC
+# Author: yinshunyao@qq.com, 2017
+#
+# reconfig the fastdfs system after the server has been installed
+# 
+#
+
+LOG='install.log'
+
+# kill the running server proccess and clear the histry log
+sudo rm *.log
+sudo killall fdfs_trackerd
+sudo killall fdfs_storaged
+sudo killall nginx
+
+# check the ip input
+function valid_ip(){
+    local  ip=$1
+    local  stat=1
+    if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        OIFS=$IFS
+        IFS='.'
+        ip=($ip)
+        IFS=$OIFS
+        [[ ${ip[0]} -le 255 && ${ip[1]} -le 255 && ${ip[2]} -le 255 && ${ip[3]} -le 255 ]]
+        stat=$?
+    fi
+    return $stat
+}
+
+##############################################################
+# Step0 GET THE OS SYSTEM                             
+##############################################################
+#
+# Get the current path and current login user
+CUR_PATH=$(pwd)
+USER=$(id | sed 's/ /\n/g' | grep uid | sed 's/.*(//g' | sed 's/)//g')
+USER_PATH="/home/"$(id | sed 's/ /\n/g' | grep uid | sed 's/.*(//g' | sed 's/)//g')
+if [ ! -d $USER_PATH ];then
+	echo "get user document $USER fail, the result is $USER_PATH "$(id) >> $LOG
+	exit 1
+fi
+echo "user document is $USER, user path is $USER_PATH, cur path is $CUR_PATH" >> $LOG
+
+# Get the linux info
+#Distributor ID: SUSE LINUX
+LINUX_DISTRIBUTOR=$(lsb_release -a | grep Distributor)
+# SUSE=$(echo $LINUX_DISTRIBUTOR | grep 'SUSE')
+if [[ ! $LINUX_DISTRIBUTOR =~ 'SUSE' ]];then
+	echo "do not support the os: $LINUX_DISTRIBUTOR" >> $LOG
+	exit 1
+else echo "the os is suse, continue install" >> $LOG
+fi
+
+
+##############################################################
+# Step1 CONFIG FOR FDFS                            
+##############################################################
+
+# CONFIG FOR FDFS
+echo 'start config the fdfs system'
+# copy the fdfs
+FDFS_CONF_PATH=/etc/fdfs/
+if [ ! -d $FDFS_CONF_PATH ];then
+	echo "make fdfs config path: $FDFS_CONF_PATH"
+	sudo mkdir $FDFS_CONF_PATH
+	if [ ! $? -eq 0];then
+		echo 'make fdfs config path fail:$1' >> $LOG
+		exit 1
+	fi
+fi
+sudo cp -rb conf/fdfs/* /etc/fdfs/
+sudo chmod +x /etc/fdfs/run.sh
+sudo chmod +x /etc/fdfs/stop.sh
+
+# creat the db document
+DATA_PATH=$USER_PATH"/fastdfs"
+if [ ! -d $DATA_PATH ];then
+	mkdir $DATA_PATH
+fi
+echo "install FastDFS_v5 success" >> $LOG
+
+# modify the db path in the config file
+sudo sed -i 's/\/home\/web\//\/home\/'$USER'\//g' `find /etc/fdfs/ -name '*.conf'`
+sudo sed -i 's/\/home\/yuqing\//\/home\/'$USER'\//g' `find /etc/fdfs/ -name '*.conf'`
+while ! valid_ip $IP
+do
+	read -p "please input Trackerd server IP:" IP
+	if valid_ip $IP;then
+		sudo sed -i 's/tracker_server=192.168.1.180:22122/tracker_server='$IP':22122/g' `find /etc/fdfs/ -name '*.conf'`
+	else echo "IP $IP error，please input again:" >> $LOG
+	fi
+done
+echo "the tracker_server IP is $IP" >> $LOG
+
+
+##############################################################
+# Step2 CONFIG FOR NGINX                           
+##############################################################
+
+# copy the resouce file for nginx
+sudo cp -r resouce/nginx/* /usr/local/nginx/html/
+# set the ip of listen for nginx
+LOCAL_IP_LIST=$(sudo ifconfig | grep 'inet addr:' | awk '{print $2}' | tr -d "addr:"  | xargs)
+sudo sed -i "s/192.168.254.132/$LOCAL_IP_LIST/g" `find /etc/fdfs/nginx/ -name 'nginx.conf'`
+
+# set the fdfs file db path in nginx
+sudo sed -i 's/\/home\/web\//\/home\/'$USER'\//g' `find /etc/fdfs/nginx/ -name 'nginx.conf'`
+
+# set the port of listen for nginx, the default port is 8999
+read -p "please input the nginx listen port,default port is 8999:" port
+if [ ! -n "$port" ];then
+	echo 'the default port 8999 will be used'
+else
+	sudo sed -i "s/8999/$port/g" `find /etc/fdfs/nginx/ -name 'nginx.conf'`
+fi
+echo "install nginx success" >> $LOG
+
+
+##############################################################
+# Step3 AUTO RUN CONFIG                         
+##############################################################
+
+# add the run.sh to the init config in OS
+# INIT_FILE=/etc/init.d/after.local
+num=$(sudo cat /etc/init.d/after.local  | grep '/etc/fdfs/run.sh' | wc -l)
+if [ $num -eq 0 ];then
+	echo "will add start.sh to after.local"
+	sudo cp -f /etc/init.d/after.local /etc/init.d/after.local.bak.for.fdfs
+	sudo sh -c 'echo "sudo /etc/fdfs/run.sh" >> /etc/init.d/after.local'
+else
+	echo "auto run config is ok"
+fi
+echo 'config the fdfs and nginx success!' >> $LOG

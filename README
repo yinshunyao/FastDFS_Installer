@@ -1,0 +1,19 @@
+1、确保install-sh脚本具有执行权限 
+
+chmod +x install-sh
+
+2、安装过程中需要保持网络通畅，有些软件包可能需要在线下载，需要输入yes确认；
+
+3、如果安装时间过长，可能需要输入sudo root密码继续安装；安装过程中会有提示
+
+4、安装过程日志可以参见同目录下install.log文件
+
+5、nginx 50000端口开放在web服务器上，location解析的魔鬼数字需要调用python后台程序生成，入参是strorage存储节点的IP，需要手工配置
+
+6、Ningx使用到的端口，web代理50000；storage代理：8888；tracked服务端口：22122；需要管理员在防火墙开放
+
+7、不运行的模块，只需要删除对应的配置文件即可。 
+
+文件存储服务器节点需要运行：fdfs server 配置文件是/etc/fdfs/tracker.conf 
+
+文件存储文件存放节点需要运行：fdfs storage 配置文件是/etc/fdfs/storage.conf,  nginx 配置文件是/etc/fdfs/nginx/nginx.conf
