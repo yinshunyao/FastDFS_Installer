@@ -9,21 +9,6 @@ sudo killall fdfs_storaged
 sudo killall nginx
 
 
-function valid_ip(){
-    local  ip=$?
-    local  stat=1
-    if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-        OIFS=$IFS
-        IFS='.'
-        ip=($ip)
-        IFS=$OIFS
-        [[ ${ip[0]} -le 255 && ${ip[1]} -le 255 && ${ip[2]} -le 255 && ${ip[3]} -le 255 ]]
-        stat=$?
-    fi
-    return $stat
-}
-
-
 ##############################################################
 # Step0 GET THE OS SYSTEM                             
 ##############################################################
@@ -54,7 +39,14 @@ fi
 ##############################################################
 
 # check and install python-devel
-search=$(rpm -q python-devel | grep python-devel)
+
+# sudo zypper in python-devel
+# sudo zypper in python-tk
+# sudo zypper in gcc-c++  gcc
+
+
+
+search=$(rpm -q python-devel | grep -v "not installed")
 plugins=""
 if [ ! -n "$search" ];then
 	sudo zypper in python-devel
@@ -65,7 +57,7 @@ if [ ! -n "$search" ];then
 fi
 
 # check and install python-tk
-search=$(rpm -q python-tk | grep python-tk)
+search=$(rpm -q python-tk | grep -v "not installed")
 if [ ! -n "$search" ];then
 	sudo zypper in python-tk
 	if [ $? -ne 0 ];then
@@ -74,8 +66,19 @@ if [ ! -n "$search" ];then
 	fi
 fi
 
+
+# check and install gcc
+search=$(rpm -q gcc | grep  -v "not installed")
+if [ ! -n "$search" ];then
+	sudo zypper in gcc
+	if [ $? -ne 0 ];then
+		echo "install gcc fail:$?" >> $LOG
+		exit 1
+	fi
+fi
+
 # check and install gcc-c++
-search=$(rpm -q gcc-c++ | grep gcc-c++ | wc -l)
+search=$(rpm -q gcc-c++ |grep -v "not installed")
 if [ ! -n "$search" ];then
 	sudo zypper in gcc-c++
 	if [ $? -ne 0 ];then

@@ -9,7 +9,7 @@
 LOG='install.log'
 
 # kill the running server proccess and clear the histry log
-sudo rm *.log
+# sudo rm *.log
 sudo killall fdfs_trackerd
 sudo killall fdfs_storaged
 sudo killall nginx
@@ -108,14 +108,18 @@ sudo sed -i "s/192.168.254.132/$LOCAL_IP_LIST/g" `find /etc/fdfs/nginx/ -name 'n
 # set the fdfs file db path in nginx
 sudo sed -i 's/\/home\/web\//\/home\/'$USER'\//g' `find /etc/fdfs/nginx/ -name 'nginx.conf'`
 
+# 端口暂时固定为8999
 # set the port of listen for nginx, the default port is 8999
-read -p "please input the nginx listen port,default port is 8999:" port
-if [ ! -n "$port" ];then
-	echo 'the default port 8999 will be used'
-else
-	sudo sed -i "s/8999/$port/g" `find /etc/fdfs/nginx/ -name 'nginx.conf'`
-fi
-echo "install nginx success" >> $LOG
+# echo "please input the nginx listen port,default port is 8999"
+# echo "if you change the port, must be sure that all storage port are the same"
+# echo "and the web server will config the FastCGI of python for the port"
+# read -p "please input the nginx listen port：" port
+# if [ ! -n "$port" ];then
+#	echo 'the default port 8999 will be used'
+# else
+#	sudo sed -i "s/8999/$port/g" `find /etc/fdfs/nginx/ -name 'nginx.conf'`
+# fi
+# echo "install nginx success" >> $LOG
 
 
 ##############################################################
