@@ -9,10 +9,13 @@
 LOG='install.log'
 
 # kill the running server proccess and clear the histry log
-# sudo rm *.log
-sudo killall fdfs_trackerd
-sudo killall fdfs_storaged
-sudo killall nginx
+#杀死进程
+sudo chmod +x  ./conf/fdfs/fdfs_tracker
+sudo ./conf/fdfs/fdfs_tracker stop
+sudo chmod +x  ./conf/fdfs/fdfs_storage
+sudo ./conf/fdfs/fdfs_storage stop
+
+
 
 # check the ip input
 function valid_ip(){
@@ -38,19 +41,19 @@ CUR_PATH=$(pwd)
 USER=$(id | sed 's/ /\n/g' | grep uid | sed 's/.*(//g' | sed 's/)//g')
 USER_PATH="/home/"$(id | sed 's/ /\n/g' | grep uid | sed 's/.*(//g' | sed 's/)//g')
 if [ ! -d $USER_PATH ];then
-	echo "get user document $USER fail, the result is $USER_PATH "$(id) >> $LOG
+	echo "`date +%Y-%m-%d\ %T`:get user document $USER fail, the result is $USER_PATH "$(id) >> $LOG
 	exit 1
 fi
-echo "user document is $USER, user path is $USER_PATH, cur path is $CUR_PATH" >> $LOG
+echo "`date +%Y-%m-%d\ %T`:user document is $USER, user path is $USER_PATH, cur path is $CUR_PATH" >> $LOG
 
 # Get the linux info
 #Distributor ID: SUSE LINUX
 LINUX_DISTRIBUTOR=$(lsb_release -a | grep Distributor)
 # SUSE=$(echo $LINUX_DISTRIBUTOR | grep 'SUSE')
 if [[ ! $LINUX_DISTRIBUTOR =~ 'SUSE' ]];then
-	echo "do not support the os: $LINUX_DISTRIBUTOR" >> $LOG
+	echo "`date +%Y-%m-%d\ %T`:do not support the os: $LINUX_DISTRIBUTOR" >> $LOG
 	exit 1
-else echo "the os is suse, continue install" >> $LOG
+else echo "`date +%Y-%m-%d\ %T`:the os is suse, continue install" >> $LOG
 fi
 
 
@@ -59,27 +62,24 @@ fi
 ##############################################################
 
 # CONFIG FOR FDFS
-echo 'start config the fdfs system'
+echo "`date +%Y-%m-%d\ %T`:start config the fdfs system" >> $LOG
+
 # copy the fdfs
 FDFS_CONF_PATH=/etc/fdfs/
-if [ ! -d $FDFS_CONF_PATH ];then
-	echo "make fdfs config path: $FDFS_CONF_PATH"
-	sudo mkdir $FDFS_CONF_PATH
-	if [ ! $? -eq 0];then
-		echo 'make fdfs config path fail:$1' >> $LOG
-		exit 1
-	fi
-fi
-sudo cp -rb conf/fdfs/* /etc/fdfs/
-sudo chmod +x /etc/fdfs/run.sh
-sudo chmod +x /etc/fdfs/stop.sh
+sudo rm -rf  $FDFS_CONF_PATH
+sudo mkdir $FDFS_CONF_PATH
+sudo cp -rf conf/fdfs/* /etc/fdfs/
+sudo chmod +x /etc/fdfs/fdfs_tracker
+sudo chmod +x /etc/fdfs/fdfs_storage
+
+
 
 # creat the db document
 DATA_PATH=$USER_PATH"/fastdfs"
 if [ ! -d $DATA_PATH ];then
 	mkdir $DATA_PATH
 fi
-echo "install FastDFS_v5 success" >> $LOG
+echo "`date +%Y-%m-%d\ %T`:install FastDFS_v5 success" >> $LOG
 
 # modify the db path in the config file
 sudo sed -i 's/\/home\/web\//\/home\/'$USER'\//g' `find /etc/fdfs/ -name '*.conf'`
@@ -89,10 +89,11 @@ do
 	read -p "please input Trackerd server IP:" IP
 	if valid_ip $IP;then
 		sudo sed -i 's/tracker_server=192.168.1.180:22122/tracker_server='$IP':22122/g' `find /etc/fdfs/ -name '*.conf'`
-	else echo "IP $IP error，please input again:" >> $LOG
+		# sudo sed -i 's/tracker_server=tracker:22122/tracker_server='$IP':22122/g' `find /etc/fdfs/ -name '*.conf'`
+	else echo "`date +%Y-%m-%d\ %T`:IP $IP error，please input again:" >> $LOG
 	fi
 done
-echo "the tracker_server IP is $IP" >> $LOG
+echo "`date +%Y-%m-%d\ %T`:the tracker_server IP is $IP" >> $LOG
 
 
 ##############################################################
@@ -100,13 +101,13 @@ echo "the tracker_server IP is $IP" >> $LOG
 ##############################################################
 
 # copy the resouce file for nginx
-sudo cp -r resouce/nginx/* /usr/local/nginx/html/
+sudo cp -r resouce/nginx/* /usr/local/nginx_storage/html/
 # set the ip of listen for nginx
 LOCAL_IP_LIST=$(sudo ifconfig | grep 'inet addr:' | awk '{print $2}' | tr -d "addr:"  | xargs)
-sudo sed -i "s/192.168.254.132/$LOCAL_IP_LIST/g" `find /etc/fdfs/nginx/ -name 'nginx.conf'`
+sudo sed -i "s/192.168.254.132/$LOCAL_IP_LIST/g" `find /etc/fdfs/nginx_storage/ -name 'nginx.conf'`
 
 # set the fdfs file db path in nginx
-sudo sed -i 's/\/home\/web\//\/home\/'$USER'\//g' `find /etc/fdfs/nginx/ -name 'nginx.conf'`
+sudo sed -i 's/\/home\/web\//\/home\/'$USER'\//g' `find /etc/fdfs/nginx_storage/ -name 'nginx.conf'`
 
 # 端口暂时固定为8999
 # set the port of listen for nginx, the default port is 8999
@@ -117,7 +118,7 @@ sudo sed -i 's/\/home\/web\//\/home\/'$USER'\//g' `find /etc/fdfs/nginx/ -name '
 # if [ ! -n "$port" ];then
 #	echo 'the default port 8999 will be used'
 # else
-#	sudo sed -i "s/8999/$port/g" `find /etc/fdfs/nginx/ -name 'nginx.conf'`
+#	sudo sed -i "s/8999/$port/g" `find /etc/fdfs/nginx_storage/ -name 'nginx.conf'`
 # fi
 # echo "install nginx success" >> $LOG
 
@@ -128,12 +129,33 @@ sudo sed -i 's/\/home\/web\//\/home\/'$USER'\//g' `find /etc/fdfs/nginx/ -name '
 
 # add the run.sh to the init config in OS
 # INIT_FILE=/etc/init.d/after.local
-num=$(sudo cat /etc/init.d/after.local  | grep '/etc/fdfs/run.sh' | wc -l)
-if [ $num -eq 0 ];then
-	echo "will add start.sh to after.local"
-	sudo cp -f /etc/init.d/after.local /etc/init.d/after.local.bak.for.fdfs
-	sudo sh -c 'echo "sudo /etc/fdfs/run.sh" >> /etc/init.d/after.local'
-else
-	echo "auto run config is ok"
+#num=$(sudo cat /etc/init.d/after.local  | grep '/etc/fdfs/run.sh' | wc -l)
+#if [ $num -eq 0 ];then
+#	echo "will add start.sh to after.local"
+#	sudo cp -f /etc/init.d/after.local /etc/init.d/after.local.bak.for.fdfs
+#	sudo sh -c 'echo "sudo /etc/fdfs/run.sh &" >> /etc/init.d/after.local'
+#	sudo sh -c 'chmod +x /etc/init.d/after.local'
+#else
+#	echo "`date +%Y-%m-%d\ %T`:auto run config has been ok" >> $LOG
+#fi
+read -p "Will start the tracker server for fdfs on the PC? type y to start:" tracker_start
+echo "`date +%Y-%m-%d\ %T`:tracker_start input is $tracker_start" >> $LOG
+if [ "$tracker_start"x = "y"x ];then
+	sudo cp /etc/fdfs/fdfs_tracker  /etc/init.d/
+	sudo chkconfig --add fdfs_tracker
+	sudo chkconfig --level 012345 fdfs_tracker on
+	sudo /etc/fdfs/fdfs_tracker start
+	echo "`date +%Y-%m-%d\ %T`:tracker service installed" >> $LOG
 fi
-echo 'config the fdfs and nginx success!' >> $LOG
+
+read -p "Will start the tracker server for fdfs on the PC? type y to start:" storage_start
+echo "`date +%Y-%m-%d\ %T`:storage_start input is $storage_start" >> $LOG
+if [ "$storage_start"x = "y"x ];then
+	sudo cp /etc/fdfs/fdfs_storage  /etc/init.d/
+	sudo chkconfig --add fdfs_storage
+	sudo chkconfig --level 012345 fdfs_storage on
+	sudo /etc/fdfs/fdfs_storage start
+	echo "`date +%Y-%m-%d\ %T`:storage service installed" >> $LOG
+fi
+
+echo "`date +%Y-%m-%d\ %T`:config the fdfs system success!" >> $LOG

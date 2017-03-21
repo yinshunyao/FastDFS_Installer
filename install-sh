@@ -2,13 +2,6 @@
 
 LOG="install.log"
 
-#清除文件，杀死进程
-sudo rm *.log
-sudo killall fdfs_trackerd
-sudo killall fdfs_storaged
-sudo killall nginx
-
-
 ##############################################################
 # Step0 GET THE OS SYSTEM                             
 ##############################################################
@@ -18,7 +11,7 @@ CUR_PATH=$(pwd)
 USER=$(id | sed 's/ /\n/g' | grep uid | sed 's/.*(//g' | sed 's/)//g')
 USER_PATH="/home/"$(id | sed 's/ /\n/g' | grep uid | sed 's/.*(//g' | sed 's/)//g')
 if [ ! -d $USER_PATH ];then
-	echo "get user document $USER fail, the result is $USER_PATH "$(id) >> $LOG
+	echo "`date +%Y-%m-%d\ %T`:get user document $USER fail, the result is $USER_PATH "$(id) >> $LOG
 	exit 1
 fi
 echo "user document is $USER, user path is $USER_PATH, cur path is $CUR_PATH" >> $LOG
@@ -28,10 +21,15 @@ echo "user document is $USER, user path is $USER_PATH, cur path is $CUR_PATH" >>
 LINUX_DISTRIBUTOR=$(lsb_release -a | grep Distributor)
 # SUSE=$(echo $LINUX_DISTRIBUTOR | grep 'SUSE')
 if [[ ! "$LINUX_DISTRIBUTOR" =~ 'SUSE' ]];then
-	echo "do not support the os: $LINUX_DISTRIBUTOR" >> $LOG
+	echo "`date +%Y-%m-%d\ %T`:do not support the os: $LINUX_DISTRIBUTOR" >> $LOG
 	exit 1
-else echo "the os is suse, continue install" >> $LOG
+else echo "`date +%Y-%m-%d\ %T`:the os is suse, continue install" >> $LOG
 fi
+
+#杀死进程
+sudo chmod +x ./conf/fdfs/stop.sh
+sudo ./conf/fdfs/stop.sh
+
 
 
 ##############################################################
@@ -39,19 +37,12 @@ fi
 ##############################################################
 
 # check and install python-devel
-
-# sudo zypper in python-devel
-# sudo zypper in python-tk
-# sudo zypper in gcc-c++  gcc
-
-
-
 search=$(rpm -q python-devel | grep -v "not installed")
 plugins=""
 if [ ! -n "$search" ];then
 	sudo zypper in python-devel
 	if [ $? -ne 0 ];then
-		echo "install python-devel fail:$?" >> $LOG
+		echo "`date +%Y-%m-%d\ %T`:install python-devel fail:$?" >> $LOG
 		exit 1
 	fi
 fi
@@ -61,7 +52,7 @@ search=$(rpm -q python-tk | grep -v "not installed")
 if [ ! -n "$search" ];then
 	sudo zypper in python-tk
 	if [ $? -ne 0 ];then
-		echo "install python-tk fail:$?" >> $LOG
+		echo "`date +%Y-%m-%d\ %T`:install python-tk fail:$?" >> $LOG
 		exit 1
 	fi
 fi
@@ -72,7 +63,7 @@ search=$(rpm -q gcc | grep  -v "not installed")
 if [ ! -n "$search" ];then
 	sudo zypper in gcc
 	if [ $? -ne 0 ];then
-		echo "install gcc fail:$?" >> $LOG
+		echo "`date +%Y-%m-%d\ %T`:install gcc fail:$?" >> $LOG
 		exit 1
 	fi
 fi
@@ -82,7 +73,7 @@ search=$(rpm -q gcc-c++ |grep -v "not installed")
 if [ ! -n "$search" ];then
 	sudo zypper in gcc-c++
 	if [ $? -ne 0 ];then
-		echo "install gcc-c++ fail:$?" >> $LOG
+		echo "`date +%Y-%m-%d\ %T`:install gcc-c++ fail:$?" >> $LOG
 		exit 1
 	fi
 fi
@@ -93,19 +84,19 @@ fi
 ##############################################################
 
 # install libfastcommon
-echo "start install libfastcommon" >> $LOG
+echo "`date +%Y-%m-%d\ %T`:start install libfastcommon" >> $LOG
 tar xvf libfastcommon-master.tar.gz
 cd libfastcommon-master
 chmod +x make.sh
 sudo ./make.sh
 if [ $? -ne 0 ];then
-	echo "build libfastcommon fail:$?" >> $LOG
+	echo "`date +%Y-%m-%d\ %T`:build libfastcommon fail:$?" >> $LOG
 	exit 1
 fi
 
 sudo ./make.sh install
 if [ $? -ne 0 ];then
-	echo "install libfastcommon fail:$?" >> $LOG
+	echo "`date +%Y-%m-%d\ %T`:install libfastcommon fail:$?" >> $LOG
 	exit 1
 fi
 
@@ -113,7 +104,7 @@ fi
 sudo export LD_LIBRARY_PATH=/usr/lib64/
 sudo ln -s /usr/lib64/libfastcommon.so /usr/local/lib/libfastcommon.so
 cd ..
-echo "install libfastcommon success" >> $LOG
+echo "`date +%Y-%m-%d\ %T`:install libfastcommon success" >> $LOG
 
 # install FastDFS
 echo "start install FastDFS" >> $LOG
@@ -122,12 +113,12 @@ cd FastDFS/
 chmod +x make.sh
 sudo ./make.sh
 if [ $? -ne 0 ];then
-	echo "build FastDFS_v5.08 fail:$?" >> $LOG
+	echo "`date +%Y-%m-%d\ %T`:build FastDFS_v5.08 fail:$?" >> $LOG
 	exit 1
 fi
 sudo ./make.sh install
 if [ $? -ne 0 ];then
-	echo "install FastDFS_v5.08 fail:$?" >> $LOG
+	echo "`date +%Y-%m-%d\ %T`:install FastDFS_v5.08 fail:$?" >> $LOG
 	exit 1
 fi
 cd ..	
@@ -136,97 +127,52 @@ cd ..
 ##############################################################
 # Step3 install the nginx                           
 ##############################################################
-
-INPUT='n'
-NGINX_FILE=/usr/local/nginx/sbin/nginx
-
 # create the web user for nginx
-echo "create the web user for nginx" >> $LOG
+echo "`date +%Y-%m-%d\ %T`:create the web user for nginx" >> $LOG
 sudo groupadd www
 sudo useradd -g www www
 
-
-# install zlib
-# ZLIB=/usr/local/include/zlib.h	
-LIBZ=$(ls /usr/local/lib/ | grep libz.so.1.2.8)
-if [ ! -n "$LIBZ" ];then
-	tar xvzf zlib-1.2.8.tar.gz
-	cd zlib-1.2.8
-	chmod +x *
-	./configure
-	if [ $? -ne 0 ];then
-		echo "config libz fai:$?" >> $LOG
-		exit 1
-	fi
-	sudo make
-	if [ $? -ne 0 ];then
-		echo "build libz fail:$?" >> $LOG
-		exit 1
-	fi
-	sudo make install
-	if [ $? -en 0 ];then
-		echo "install libz fail:$?" >> $LOG
-		exit 1
-	fi
-	cd ..	
-	echo "install zlib success" >> $LOG
-else
-	echo "ZLIB has installed，if you want re-install, please re-install it manually" >> $LOG
-	# read -p "enter any key continue" TEMP
-fi
-
-
-# install pcre
+echo "`date +%Y-%m-%d\ %T`:tar pcre..." >> $LOG
 tar xvzf pcre-8.38.tar.gz
-cd pcre-8.38
-chmod +x *
-./configure
-if [ $? -ne 0 ];then
-	echo "config pcre fail:$?" >> $LOG
-	exit 1
-fi
-sudo make
-if [ $? -ne 0 ];then
-	echo "build pcre fail:$?" >> $LOG
-	exit 1
-fi
-sudo make install
-if [ $? -ne 0 ];then
-	echo "install pcre fail:$?" >> $LOG
-	exit 1
-fi
-cd ..
-echo "install pcre success" >> $LOG
+PCRE="$CUR_PATH""/pcre-8.38"
+
+
+echo "`date +%Y-%m-%d\ %T`:tar zlib..." >> $LOG
+tar xvzf zlib-1.2.8.tar.gz
+ZLIB="$CUR_PATH""/zlib-1.2.8"
+
+echo "`date +%Y-%m-%d\ %T`:tar openssl..." >> $LOG
+tar xvzf openssl-1.0.1u.tar.gz
+OPEN_SSL="$CUR_PATH""/openssl-1.0.1u"
+
 
 # install_start "nginx-1.6.3"
+echo "`date +%Y-%m-%d\ %T`:tar fastdfs-nginx-module..." >> $LOG
 tar xvzf fastdfs-nginx-module_v1.16.tar.gz
 # SuSE os, modify the path "/usr/local/" ot "/usr/"
 # Distributor ID: SUSE LINUX
-CONFIG_FILE="$CUR_PATH""/fastdfs-nginx-module/src/config"
-sed -i 's/usr\/local/usr/g' $CONFIG_FILE
+sed -i 's/usr\/local/usr/g' "$CUR_PATH""/fastdfs-nginx-module/src/config"
+MODULE_PATH="$CUR_PATH""/fastdfs-nginx-module/src"
+echo "`date +%Y-%m-%d\ %T`:fastdfs-nginx-modle path is $MODULE_PATH" >> $LOG
 
-echo "tar openssl" >> $LOG
-tar xvzf openssl-1.0.1u.tar.gz
-echo "tar nginx" >> $LOG
+echo "`date +%Y-%m-%d\ %T`:tar nginx" >> $LOG
 tar xvzf nginx-1.6.3.tar.gz
 cd nginx-1.6.3
-echo "config nginx intall params" >> $LOG
-MODULE_PATH="$CUR_PATH""/fastdfs-nginx-module/src"
-OPEN_SSL="$CUR_PATH""/openssl-1.0.1u"
+echo "`date +%Y-%m-%d\ %T`:config nginx intall params" >> $LOG
 chmod +x *
-sudo ./configure --user=www --group=www --add-module=$MODULE_PATH --prefix=/usr/local/nginx  --with-http_stub_status_module --with-http_ssl_module --with-openssl=$OPEN_SSL
+sudo ./configure --user=www --group=www --prefix=/usr/local/nginx_storage  --add-module=$MODULE_PATH  --with-http_stub_status_module --with-http_ssl_module --with-openssl=$OPEN_SSL --with-pcre=$PCRE --with-zlib=$ZLIB
 if [ $? -ne 0 ];then
-	echo "config nginx fail:$?" >> $LOG
+	echo "`date +%Y-%m-%d\ %T`:config nginx fail:$?" >> $LOG
 	exit 1
 fi
 sudo make
 if [ $? -ne 0 ];then
-	echo "build nginx fail:$?" >> $LOG
+	echo "`date +%Y-%m-%d\ %T`:build nginx fail:$?" >> $LOG
 	exit 1
 fi
 sudo make install
 if [ $? -ne 0 ];then
-	echo "install nginx fail:$?" >> $LOG
+	echo "`date +%Y-%m-%d\ %T`:install nginx fail:$?" >> $LOG
 	exit 1
 fi
 cd ..
@@ -239,7 +185,7 @@ chmod +x reconfig-sh
 
 
 
-echo "clear the temp files" >> $LOG
+echo "`date +%Y-%m-%d\ %T`:clear the temp files" >> $LOG
 sudo rm -rf libfastcommon-master
 sudo rm -rf FastDFS
 sudo rm -rf zlib-1.2.8
@@ -248,12 +194,5 @@ sudo rm -rf fastdfs-nginx-module
 sudo rm -rf openssl-1.0.1u
 sudo rm -rf nginx-1.6.3
 
-##############################################################
-# Step5 RUN                    
-##############################################################
-# 启动程序
-chmod +x /etc/fdfs/run.sh
-chmod +x /etc/fdfs/stop.sh
-sudo /etc/fdfs/run.sh
 
-echo "install the fdfs and nginx success!" >> $LOG
+echo "`date +%Y-%m-%d\ %T`:install the fdfs and nginx success!" >> $LOG

@@ -1,0 +1,62 @@
+#! /bin/sh
+#chkconfig:50000 50001
+#
+#run_nginx_only  fdfs system, tracker server, tracker storage(nginx)
+#
+#processname: fdfs
+#
+#description:nginx_web_auto_run
+#config: /etc/nginx_web/nginx.conf
+#program:/usr/local/nginx_web/sbin/nginx
+#status:/etc/inid.d/nginx_web status
+
+#fdfsdfs auto start sh start #####################################################
+#/etc/fdfs/run.sh
+
+FDFS_LOG="/etc/fdfs/fdfs.log"
+STORAGED_CONF=/etc/fdfs/storage.conf
+NGINX_CONF=/etc/fdfs/nginx_storage/nginx.conf
+case "$1" in
+start)
+	if [ -f $STORAGED_CONF ]
+	then
+		STORAGED=/usr/bin/fdfs_storaged
+		sudo echo "`date +%Y-%m-%d\ %T`:starting the storaged of fdfs" >> $FDFS_LOG
+		STORAGED_CMD="$STORAGED $STORAGED_CONF "
+		sudo $STORAGED_CMD &
+		RETVAL=$?
+		sudo echo "`date +%Y-%m-%d\ %T`:Storaged start $RETVAL" >> $FDFS_LOG
+	else sudo echo "`date +%Y-%m-%d\ %T`:$STORAGED_CONF not found" >> $FDFS_LOG
+	fi
+	
+	if [ -f $NGINX_CONF ]
+	then
+		NGINX=/usr/local/nginx_storage/sbin/nginx
+		sudo echo "`date +%Y-%m-%d\ %T`:starting the nginx of fdfs" >> $FDFS_LOG
+		STORAGED_CMD="$NGINX -c $NGINX_CONF "
+		sudo $STORAGED_CMD &
+		RETVAL=$?
+		sudo echo "`date +%Y-%m-%d\ %T`: Nginx start $RETVAL" >> $FDFS_LOG
+	else sudo echo "`date +%Y-%m-%d\ %T`: $NGINX_CONF not found" >> $FDFS_LOG
+	fi
+	;;
+stop)
+	PID=$(ps -ef |grep storage | grep fdfs | grep -v grep |awk '{print($2)}' |xargs)
+	echo "running storage: "$PID
+	if [ -n "$PID" ];then
+		sudo kill $PID
+	fi
+	;;
+restart)
+	$0 stop || true
+	$0 start
+	;;
+*)
+	echo "use the command start|stop|restart"
+	exit 1
+	;;
+esac
+#fdfsdfs auto start sh end #####################################################
+
+
+

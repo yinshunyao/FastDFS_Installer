@@ -1,0 +1,49 @@
+#! /bin/sh
+#chkconfig:20021
+#
+#run_nginx_only  fdfs system, tracker server, tracker storage(nginx)
+#
+#processname: fdfs_trackerd
+#
+
+
+#fdfsdfs auto start sh start #####################################################
+#/etc/fdfs/run.sh
+
+FDFS_LOG="/etc/fdfs/fdfs.log"
+
+case "$1" in
+start)
+	TRACKERD_CONF=/etc/fdfs/tracker.conf
+	# if config file exist
+	if [ -f $TRACKERD_CONF ]
+	then
+		sudo echo "`date +%Y-%m-%d\ %T`:starting the trackerd of fdfs" >> $FDFS_LOG
+		TRACKERD=/usr/bin/fdfs_trackerd
+		TRACKERD_CMD="$TRACKERD $TRACKERD_CONF "
+		sudo $TRACKERD_CMD &
+		RETVAL=$?
+		sudo echo "`date +%Y-%m-%d\ %T`:Trackerd start result - $RETVAL" >> $FDFS_LOG
+	else sudo echo "`date +%Y-%m-%d\ %T`:$TRACKERD_CONF not found, start fail" >> $FDFS_LOG
+	fi
+	;;
+stop)
+	PID=$(ps -ef |grep tracker | grep fdfs | grep -v grep |awk '{print($2)}' |xargs)
+	echo "running tracker: "$PID
+	if [ -n "$PID" ];then
+		sudo kill $PID
+	fi
+	;;
+restart)
+	$0 stop || true
+	$0 start
+	;;
+*)
+	echo "use the command start|stop|restart"
+	exit 1
+	;;
+esac
+#fdfsdfs auto start sh end #####################################################
+
+
+
